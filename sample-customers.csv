@@ -1,4 +1,5 @@
-name,industry,size,location,annual_revenue,website,contact_email
+name,industry,size,location,annual_revenue,website,email
+Freshworks,SaaS,Medium,India,800000000,http://freshworks.com/,dpo@freshworks.com
 Acme Corporation,Technology,Large,San Francisco,50000000,https://acme.com,contact@acme.com
 TechStart Inc,Software,Small,Austin,2500000,https://techstart.io,hello@techstart.io
 Global Solutions,Consulting,Medium,New York,15000000,https://globalsolutions.com,info@globalsolutions.com

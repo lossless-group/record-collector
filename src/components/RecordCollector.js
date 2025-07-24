@@ -15,14 +15,13 @@ export default function RecordCollector() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-
-
   const {
     records,
     selectedRecord,
     setSelectedRecord,
     deleteRecord,
-    deleteAllRecords
+    deleteAllRecords,
+    availableFields
   } = useRecordStore();
 
   // Filter records based on search term
@@ -30,14 +29,25 @@ export default function RecordCollector() {
     record.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Calculate statistics
-  const locationCounts = records.reduce((acc, record) => {
-    if (record.location) {
-      acc[record.location] = (acc[record.location] || 0) + 1;
-    }
-    return acc;
-  }, {});
+  // Calculate statistics dynamically based on available fields
+  const getFieldCounts = (fieldName) => {
+    return records.reduce((acc, record) => {
+      if (record[fieldName]) {
+        acc[record[fieldName]] = (acc[record[fieldName]] || 0) + 1;
+      }
+      return acc;
+    }, {});
+  };
 
+  // Try to find a location-like field for statistics
+  const locationField = availableFields.find(field => 
+    field.toLowerCase().includes('location') || 
+    field.toLowerCase().includes('city') || 
+    field.toLowerCase().includes('state') || 
+    field.toLowerCase().includes('country')
+  );
+  
+  const locationCounts = locationField ? getFieldCounts(locationField) : {};
   const topLocation = Object.entries(locationCounts).sort(([,a], [,b]) => b - a)[0];
   
   const augmentedCount = records.filter(record => record.augmentationResults).length;
@@ -86,7 +96,7 @@ export default function RecordCollector() {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Upload className="w-4 h-4" />
-                Import CSV
+                Import
               </button>
               
               {records.length > 0 && (
@@ -125,7 +135,9 @@ export default function RecordCollector() {
                   <Database className="w-8 h-8 text-purple-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Top Location</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Top {locationField ? locationField.charAt(0).toUpperCase() + locationField.slice(1).replace(/_/g, ' ') : 'Location'}
+                  </p>
                   <p className="text-2xl font-bold text-gray-900">
                     {topLocation ? `${topLocation[0]} (${topLocation[1]})` : 'N/A'}
                   </p>

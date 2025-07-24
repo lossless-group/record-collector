@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { X, Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Upload, FileText, AlertCircle, CheckCircle, Database } from 'lucide-react';
 import { parseCSV } from '../lib/csvParser';
 import { useRecordStore } from '../lib/store';
 
@@ -11,8 +11,9 @@ export default function ImportModal({ isOpen, onClose }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [importSource, setImportSource] = useState('csv'); // 'csv' or 'database'
   const fileInputRef = useRef(null);
-  const addRecords = useRecordStore(state => state.addRecords);
+  const replaceAllRecords = useRecordStore(state => state.replaceAllRecords);
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -58,21 +59,27 @@ export default function ImportModal({ isOpen, onClose }) {
   };
 
   const handleImport = async () => {
-    if (!file) return;
+    if (importSource === 'csv' && !file) return;
 
     setIsImporting(true);
     try {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const csvText = e.target.result;
-        const records = parseCSV(csvText);
-        addRecords(records);
-        onClose();
-        setFile(null);
-        setPreview(null);
-        setError(null);
-      };
-      reader.readAsText(file);
+      if (importSource === 'csv') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const csvText = e.target.result;
+          const records = parseCSV(csvText);
+          replaceAllRecords(records);
+          onClose();
+          setFile(null);
+          setPreview(null);
+          setError(null);
+        };
+        reader.readAsText(file);
+      } else if (importSource === 'database') {
+        // Dummy implementation for remote database import
+        // This will be implemented later
+        setError('Remote database import functionality coming soon!');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -85,6 +92,7 @@ export default function ImportModal({ isOpen, onClose }) {
     setPreview(null);
     setError(null);
     setDragActive(false);
+    setImportSource('csv');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -113,73 +121,134 @@ export default function ImportModal({ isOpen, onClose }) {
 
         {/* Content */}
         <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-          {/* Instructions */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-medium text-blue-900 mb-2">CSV Requirements</h3>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Must include a "name" column</li>
-              <li>• First row should contain column headers</li>
-              <li>• Supports quoted fields with commas</li>
-              <li>• Numbers will be automatically converted</li>
-            </ul>
+          {/* Import Source Selection */}
+          <div className="flex gap-4">
+            <button
+              onClick={() => setImportSource('csv')}
+              className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-lg border-2 transition-colors ${
+                importSource === 'csv'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 hover:border-gray-400 text-gray-700'
+              }`}
+            >
+              <Upload className="w-5 h-5" />
+              <span className="font-medium">CSV File</span>
+            </button>
+            <button
+              onClick={() => setImportSource('database')}
+              className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-lg border-2 transition-colors ${
+                importSource === 'database'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 hover:border-gray-400 text-gray-700'
+              }`}
+            >
+              <Database className="w-5 h-5" />
+              <span className="font-medium">Remote Database</span>
+            </button>
           </div>
 
-          {/* File Upload Area */}
-          <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              dragActive 
-                ? 'border-blue-400 bg-blue-50' 
-                : 'border-gray-300 hover:border-gray-400'
-            }`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={(e) => e.target.files[0] && handleFile(e.target.files[0])}
-              className="hidden"
-            />
-            
-            {!file ? (
-              <div className="space-y-4">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto" />
-                <div>
-                  <p className="text-lg font-medium text-gray-900 mb-2">
-                    Drop your CSV file here
-                  </p>
-                  <p className="text-gray-500 mb-4">
-                    or click to browse files
-                  </p>
+          {/* Instructions */}
+          {importSource === 'csv' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-medium text-blue-900 mb-2">CSV Requirements</h3>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Must include a "name" column</li>
+                <li>• First row should contain column headers</li>
+                <li>• Supports quoted fields with commas</li>
+                <li>• Numbers will be automatically converted</li>
+              </ul>
+            </div>
+          )}
+
+          {importSource === 'database' && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <h3 className="font-medium text-purple-900 mb-2">Remote Database Import</h3>
+              <p className="text-sm text-purple-800">
+                Connect to your remote database to import records directly. This feature is coming soon!
+              </p>
+            </div>
+          )}
+
+          {/* Import Area */}
+          {importSource === 'csv' && (
+            <div
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                dragActive 
+                  ? 'border-blue-400 bg-blue-50' 
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={(e) => e.target.files[0] && handleFile(e.target.files[0])}
+                className="hidden"
+              />
+              
+              {!file ? (
+                <div className="space-y-4">
+                  <Upload className="w-12 h-12 text-gray-400 mx-auto" />
+                  <div>
+                    <p className="text-lg font-medium text-gray-900 mb-2">
+                      Drop your CSV file here
+                    </p>
+                    <p className="text-gray-500 mb-4">
+                      or click to browse files
+                    </p>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Choose File
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <FileText className="w-12 h-12 text-green-500 mx-auto" />
+                  <div>
+                    <p className="text-lg font-medium text-gray-900">{file.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {(file.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    className="text-blue-600 hover:text-blue-800 text-sm"
                   >
-                    Choose File
+                    Choose different file
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {importSource === 'database' && (
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+              <div className="space-y-4">
+                <Database className="w-12 h-12 text-gray-400 mx-auto" />
+                <div>
+                  <p className="text-lg font-medium text-gray-900 mb-2">
+                    Connect to Remote Database
+                  </p>
+                  <p className="text-gray-500 mb-4">
+                    Import records directly from your database
+                  </p>
+                  <button
+                    onClick={() => setError('Remote database import functionality coming soon!')}
+                    className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    Connect Database
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <FileText className="w-12 h-12 text-green-500 mx-auto" />
-                <div>
-                  <p className="text-lg font-medium text-gray-900">{file.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {(file.size / 1024).toFixed(1)} KB
-                  </p>
-                </div>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-blue-600 hover:text-blue-800 text-sm"
-                >
-                  Choose different file
-                </button>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -220,7 +289,7 @@ export default function ImportModal({ isOpen, onClose }) {
           </button>
           <button
             onClick={handleImport}
-            disabled={!file || error || isImporting}
+            disabled={(importSource === 'csv' && !file) || error || isImporting}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isImporting ? 'Importing...' : 'Import Records'}

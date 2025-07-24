@@ -1,11 +1,17 @@
 export function parseCSV(csvText) {
-  const lines = csvText.trim().split('\n');
-  if (lines.length < 2) {
+  const trimmedText = csvText.trim();
+  if (!trimmedText) {
+    throw new Error('CSV text is empty');
+  }
+
+  // Parse the entire CSV as a single string to handle multiline fields
+  const rows = parseCSVRows(trimmedText);
+  if (rows.length < 2) {
     throw new Error('CSV must have at least a header row and one data row');
   }
 
   // Parse header
-  const headers = parseCSVLine(lines[0]);
+  const headers = rows[0];
   
   // Validate required 'name' column
   if (!headers.includes('name')) {
@@ -14,9 +20,9 @@ export function parseCSV(csvText) {
 
   // Parse data rows
   const records = [];
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim()) {
-      const values = parseCSVLine(lines[i]);
+  for (let i = 1; i < rows.length; i++) {
+    const values = rows[i];
+    if (values.length > 0) {
       const record = {};
       
       headers.forEach((header, index) => {
@@ -40,19 +46,20 @@ export function parseCSV(csvText) {
   return records;
 }
 
-function parseCSVLine(line) {
-  const result = [];
-  let current = '';
+function parseCSVRows(csvText) {
+  const rows = [];
+  let currentRow = [];
+  let currentField = '';
   let inQuotes = false;
   let i = 0;
 
-  while (i < line.length) {
-    const char = line[i];
+  while (i < csvText.length) {
+    const char = csvText[i];
     
     if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
+      if (inQuotes && csvText[i + 1] === '"') {
         // Escaped quote
-        current += '"';
+        currentField += '"';
         i += 2;
       } else {
         // Toggle quote state
@@ -61,17 +68,27 @@ function parseCSVLine(line) {
       }
     } else if (char === ',' && !inQuotes) {
       // End of field
-      result.push(current.trim());
-      current = '';
+      currentRow.push(currentField.trim());
+      currentField = '';
+      i++;
+    } else if (char === '\n' && !inQuotes) {
+      // End of row (but only if not in quotes)
+      currentRow.push(currentField.trim());
+      rows.push(currentRow);
+      currentRow = [];
+      currentField = '';
       i++;
     } else {
-      current += char;
+      currentField += char;
       i++;
     }
   }
   
-  // Add the last field
-  result.push(current.trim());
+  // Add the last field and row
+  currentRow.push(currentField.trim());
+  if (currentRow.length > 0) {
+    rows.push(currentRow);
+  }
   
-  return result;
+  return rows;
 } 

@@ -10,7 +10,7 @@ export default function ExportPage() {
   const [isPushing, setIsPushing] = useState(false);
   const [pushStatus, setPushStatus] = useState(null);
 
-  const { records } = useRecordStore();
+  const { records, availableFields } = useRecordStore();
 
   const handleSelectRecord = (recordId) => {
     setSelectedRecords(prev => 
@@ -51,38 +51,54 @@ export default function ExportPage() {
       selectedRecords.includes(record.id)
     );
 
-    const exportData = selectedRecordData.map(record => ({
-      // Imported Data
-      name: record.name,
-      industry: record.industry,
-      size: record.size,
-      location: record.location,
-      annual_revenue: record.annual_revenue,
-      website: record.website,
-      contact_email: record.contact_email,
-      // Augmentation Data
-      has_ai_analysis: !!record.augmentationResults,
-      last_augmented: record.lastAugmented,
-      ai_analysis: record.augmentationResults || 'Not analyzed'
-    }));
+    // Get all unique custom property names from all selected records
+    const allCustomProperties = selectedRecordData
+      .flatMap(record => Object.keys(record.customProperties || {}))
+      .filter((value, index, self) => self.indexOf(value) === index); // Remove duplicates
 
+    // Create CSV header with all available fields plus custom properties plus augmentation fields
+    const csvHeaders = [
+      ...availableFields.map(field => field.toLowerCase().replace(/_/g, ' ')),
+      ...allCustomProperties.map(prop => `ai ${prop.toLowerCase().replace(/_/g, ' ')}`),
+      'has ai analysis',
+      'last augmented', 
+      'ai analysis'
+    ];
+
+    // Create CSV data rows
+    const csvData = selectedRecordData.map(record => {
+      // Get all available field values
+      const fieldValues = availableFields.map(field => record[field] || '');
+      
+      // Get custom property values in the same order as headers
+      const customPropertyValues = allCustomProperties.map(prop => 
+        record.customProperties?.[prop] || ''
+      );
+      
+      // Get augmentation data
+      const augmentationValues = [
+        record.augmentationResults ? 'Yes' : 'No',
+        record.lastAugmented ? new Date(record.lastAugmented).toLocaleString() : '',
+        record.augmentationResults || 'Not analyzed'
+      ];
+
+      return [...fieldValues, ...customPropertyValues, ...augmentationValues];
+    });
+
+    // Create CSV content with proper escaping
     const csvContent = [
-      // Header
-      ['Name', 'Industry', 'Size', 'Location', 'Annual Revenue', 'Website', 'Contact Email', 'Has AI Analysis', 'Last Augmented', 'AI Analysis'],
-      // Data rows
-      ...exportData.map(record => [
-        record.name,
-        record.industry,
-        record.size,
-        record.location,
-        record.annual_revenue,
-        record.website,
-        record.contact_email,
-        record.has_ai_analysis ? 'Yes' : 'No',
-        record.last_augmented ? new Date(record.last_augmented).toLocaleString() : '',
-        record.ai_analysis
-      ])
-    ].map(row => row.map(field => `"${field || ''}"`).join(',')).join('\n');
+      csvHeaders,
+      ...csvData
+    ].map(row => 
+      row.map(field => {
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        const escapedField = String(field).replace(/"/g, '""');
+        if (escapedField.includes(',') || escapedField.includes('"') || escapedField.includes('\n')) {
+          return `"${escapedField}"`;
+        }
+        return escapedField;
+      }).join(',')
+    ).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);

@@ -13,32 +13,74 @@ export default function AugmentPage() {
   const [processingRecords, setProcessingRecords] = useState(new Set());
   const [results, setResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
-  const [perplexityConfig, setPerplexityConfig] = useState({
-    apiKey: '',
-    prompt: `Analyze the following company information and provide insights:
+  const availableFields = useRecordStore(state => state.availableFields);
+  
+  // Generate dynamic prompt template based on available fields
+  const generateDefaultPrompt = (customProperties = []) => {
+    const fieldPlaceholders = availableFields.map(field => `- ${field}: {${field}}`).join('\n');
+    
+    let prompt = `Analyze the following company information and provide insights:
 
 **Company Details:**
-- Name: {name}
-- Industry: {industry}
-- Size: {size}
-- Location: {location}
-- Annual Revenue: {annual_revenue}
-- Website: {website}
-- Contact: {contact_email}
+${fieldPlaceholders}
 
 Please provide:
 1. Market analysis and competitive landscape
 2. Growth opportunities and potential challenges
 3. Industry trends that may affect this company
 4. Recommendations for business development
-5. Key insights about their market position`,
-    useDeepResearch: false,
-    useSonarPro: false
-  });
+5. Key insights about their market position`;
+
+    // Add custom properties section if any are defined
+    if (customProperties && customProperties.length > 0) {
+      const customPropertiesSection = `
+
+**Additional Research Required:**
+Please research and provide the following specific data points for this company. Format your response as a structured JSON object at the end of your analysis:
+
+${customProperties.map(prop => `- ${prop}: Research and provide the ${prop.replace(/_/g, ' ')} for this company`).join('\n')}
+
+**IMPORTANT:** End your response with a JSON object containing the researched data in this exact format:
+\`\`\`json
+{
+  "custom_properties": {
+${customProperties.map(prop => `    "${prop}": "researched_value_here"`).join(',\n')}
+  }
+}
+\`\`\``;
+      
+      prompt += customPropertiesSection;
+    }
+
+    return prompt;
+  };
 
   const [useRealAPI, setUseRealAPI] = useState(false);
 
-  const { records, updateRecordAugmentation } = useRecordStore();
+  const { 
+    records, 
+    updateRecordAugmentation, 
+    perplexityConfig, 
+    updatePerplexityConfig 
+  } = useRecordStore();
+
+  // Update prompt when available fields or custom properties change
+  useEffect(() => {
+    if (availableFields.length > 0) {
+      const newPrompt = generateDefaultPrompt(perplexityConfig.customProperties);
+      if (newPrompt !== perplexityConfig.prompt) {
+        updatePerplexityConfig({ prompt: newPrompt });
+      }
+    }
+  }, [availableFields, perplexityConfig.customProperties]);
+
+  // Initialize prompt if empty
+  useEffect(() => {
+    if (!perplexityConfig.prompt && availableFields.length > 0) {
+      const newPrompt = generateDefaultPrompt(perplexityConfig.customProperties);
+      updatePerplexityConfig({ prompt: newPrompt });
+    }
+  }, [availableFields, perplexityConfig.prompt]);
 
   const handleSelectAll = () => {
     if (selectedRecords.length === records.length) {
@@ -83,7 +125,8 @@ Please provide:
         const augmentationData = {
           recordId: record.id,
           recordName: record.name,
-          result,
+          result: result.analysis,
+          customProperties: result.customProperties,
           timestamp: new Date().toISOString()
         };
         
@@ -124,34 +167,94 @@ Please provide:
     });
 
     try {
-      const response = await fetch('https://api.perplexity.ai/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${config.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: config.useSonarPro ? 'sonar-medium-online' : 'llama-3.1-sonar-small-128k-online',
-          messages: [
-            {
-              role: 'user',
-              content: processedPrompt
-            }
-          ],
-          max_tokens: 2000,
-          temperature: 0.7,
-          top_p: 0.9,
-          search_domain_filter: config.useDeepResearch ? undefined : null,
-          search_recency_filter: config.useDeepResearch ? 'month' : null
-        })
-      });
+      // Build request body
+      const requestBody = {
+        model: config.selectedModel || 'sonar',
+        messages: [
+          {
+            role: 'user',
+            content: processedPrompt
+          }
+        ],
+        max_tokens: 2000,
+        temperature: 0.7,
+        top_p: 0.9
+      };
 
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      // If the first request fails, try with a simpler model
+      const tryWithFallbackModel = async (requestBody) => {
+        try {
+          const response = await fetch('https://api.perplexity.ai/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${config.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API Error Response:', errorText);
+            
+            // If it's a model-related error, try with a fallback model
+            if (response.status === 400 && (errorText.includes('model') || errorText.includes('invalid'))) {
+              console.log('Trying with fallback model...');
+              const fallbackRequestBody = {
+                ...requestBody,
+                model: 'sonar' // Use the most basic model
+              };
+              
+              const fallbackResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${config.apiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(fallbackRequestBody)
+              });
+              
+              if (!fallbackResponse.ok) {
+                const fallbackErrorText = await fallbackResponse.text();
+                throw new Error(`Fallback API request failed: ${fallbackResponse.status} ${fallbackResponse.statusText} - ${fallbackErrorText}`);
+              }
+              
+              return fallbackResponse;
+            }
+            
+            throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+          }
+          
+          return response;
+        } catch (error) {
+          throw error;
+        }
+      };
+
+      // Add search parameters only if deep research is enabled
+      if (config.useDeepResearch) {
+        requestBody.search_recency_filter = 'month';
       }
 
+      console.log('Perplexity API Request:', {
+        model: requestBody.model,
+        messageLength: processedPrompt.length,
+        useDeepResearch: config.useDeepResearch,
+        selectedModel: config.selectedModel
+      });
+
+      const response = await tryWithFallbackModel(requestBody);
+
       const data = await response.json();
-      return data.choices[0]?.message?.content || 'No response from API';
+      const aiResponse = data.choices[0]?.message?.content || 'No response from API';
+      
+      // Parse custom properties from the response
+      const customProperties = parseCustomProperties(aiResponse);
+      
+      return {
+        analysis: aiResponse,
+        customProperties
+      };
     } catch (error) {
       console.error('Perplexity API call failed:', error);
       throw new Error(`API call failed: ${error.message}`);
@@ -237,7 +340,92 @@ The ${record.industry} industry is experiencing steady growth with increasing de
 4. Invest in employee development`
     };
 
-    return responses[record.industry] || responses.default;
+    const baseResponse = responses[record.industry] || responses.default;
+    
+    // Add custom properties if configured
+    let fullResponse = baseResponse;
+    let customProperties = {};
+    
+    if (config.customProperties && config.customProperties.length > 0) {
+      // Generate simulated custom properties
+      customProperties = config.customProperties.reduce((acc, prop) => {
+        acc[prop] = generateSimulatedValue(prop, record);
+        return acc;
+      }, {});
+      
+      fullResponse += `
+
+\`\`\`json
+{
+  "custom_properties": {
+${Object.entries(customProperties).map(([key, value]) => `    "${key}": "${value}"`).join(',\n')}
+  }
+}
+\`\`\``;
+    }
+    
+    return {
+      analysis: fullResponse,
+      customProperties
+    };
+  };
+
+  // Helper function to parse custom properties from AI response
+  const parseCustomProperties = (response) => {
+    try {
+      // Look for JSON block in the response
+      const jsonMatch = response.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        const jsonData = JSON.parse(jsonMatch[1]);
+        return jsonData.custom_properties || {};
+      }
+      
+      // Fallback: try to find JSON anywhere in the response
+      const jsonRegex = /\{[\s\S]*"custom_properties"[\s\S]*\}/;
+      const match = response.match(jsonRegex);
+      if (match) {
+        const jsonData = JSON.parse(match[0]);
+        return jsonData.custom_properties || {};
+      }
+      
+      return {};
+    } catch (error) {
+      console.warn('Failed to parse custom properties from AI response:', error);
+      return {};
+    }
+  };
+
+  // Helper function to generate simulated values for custom properties
+  const generateSimulatedValue = (property, record) => {
+    const propertyLower = property.toLowerCase();
+    
+    if (propertyLower.includes('profit') || propertyLower.includes('revenue')) {
+      const baseRevenue = record.annual_revenue || 10000000;
+      const profitMargin = 0.15 + Math.random() * 0.25; // 15-40% profit margin
+      return `$${(baseRevenue * profitMargin / 1000000).toFixed(1)}M`;
+    }
+    
+    if (propertyLower.includes('market_share') || propertyLower.includes('market')) {
+      return `${(Math.random() * 15 + 1).toFixed(1)}%`;
+    }
+    
+    if (propertyLower.includes('employee') || propertyLower.includes('staff')) {
+      const sizeMultiplier = record.size === 'Small' ? 50 : record.size === 'Medium' ? 200 : 1000;
+      return Math.floor(sizeMultiplier * (0.8 + Math.random() * 0.4)).toString();
+    }
+    
+    if (propertyLower.includes('growth') || propertyLower.includes('expansion')) {
+      return `${(Math.random() * 30 + 5).toFixed(1)}%`;
+    }
+    
+    if (propertyLower.includes('valuation') || propertyLower.includes('worth')) {
+      const baseRevenue = record.annual_revenue || 10000000;
+      const multiplier = 2 + Math.random() * 8; // 2-10x revenue multiple
+      return `$${(baseRevenue * multiplier / 1000000).toFixed(1)}M`;
+    }
+    
+    // Default fallback
+    return `Simulated ${property.replace(/_/g, ' ')}`;
   };
 
   const selectedRecordsData = records.filter(record => 
@@ -340,10 +528,7 @@ The ${record.industry} industry is experiencing steady growth with increasing de
           {/* Right Column - Configuration */}
           <div className="space-y-6">
             {/* Perplexity Configuration */}
-            <PerplexityConfig
-              config={perplexityConfig}
-              onConfigChange={setPerplexityConfig}
-            />
+            <PerplexityConfig />
 
             {/* API Mode Toggle */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
