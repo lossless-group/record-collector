@@ -1,0 +1,11 @@
+name,industry,size,location,annual_revenue,website,contact_email
+Acme Corporation,Technology,Large,San Francisco,50000000,https://acme.com,contact@acme.com
+TechStart Inc,Software,Small,Austin,2500000,https://techstart.io,hello@techstart.io
+Global Solutions,Consulting,Medium,New York,15000000,https://globalsolutions.com,info@globalsolutions.com
+Innovate Labs,Research,Small,Boston,800000,https://innovatelabs.com,research@innovatelabs.com
+MegaCorp Industries,Manufacturing,Large,Chicago,75000000,https://megacorp.com,corporate@megacorp.com
+StartupXYZ,Fintech,Small,Seattle,1200000,https://startupxyz.com,team@startupxyz.com
+DataFlow Systems,Analytics,Medium,Denver,8500000,https://dataflow.com,data@dataflow.com
+Green Energy Co,Energy,Medium,Portland,22000000,https://greenenergy.com,green@greenenergy.com
+CloudTech Solutions,Cloud Services,Large,Atlanta,45000000,https://cloudtech.com,cloud@cloudtech.com
+Local Business LLC,Retail,Small,Miami,950000,https://localbusiness.com,local@localbusiness.com 
