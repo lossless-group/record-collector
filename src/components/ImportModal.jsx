@@ -111,7 +111,7 @@ export default function ImportModal({ isOpen, onClose }) {
           <h2 className="text-xl font-semibold text-gray-900">Import Records</h2>
           <button
             onClick={handleClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                         className="p-2 text-white hover:text-white hover:bg-blue-700 rounded-lg transition-colors bg-blue-600"
           >
             <X className="w-5 h-5" />
           </button>
@@ -125,8 +125,8 @@ export default function ImportModal({ isOpen, onClose }) {
               onClick={() => setImportSource('csv')}
               className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-lg border-2 transition-colors ${
                 importSource === 'csv'
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-300 hover:border-gray-400 text-gray-700'
+                  ? 'border-blue-700 bg-blue-700 text-white'
+                  : 'border-blue-500 bg-blue-500 text-white hover:bg-blue-600'
               }`}
             >
               <Upload className="w-5 h-5" />
@@ -136,8 +136,8 @@ export default function ImportModal({ isOpen, onClose }) {
               onClick={() => setImportSource('database')}
               className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-lg border-2 transition-colors ${
                 importSource === 'database'
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-300 hover:border-gray-400 text-gray-700'
+                  ? 'border-blue-700 bg-blue-700 text-white'
+                  : 'border-blue-500 bg-blue-500 text-white hover:bg-blue-600'
               }`}
             >
               <Database className="w-5 h-5" />

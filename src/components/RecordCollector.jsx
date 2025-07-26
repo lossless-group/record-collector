@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Upload, Search, Trash2, Database, Users } from 'lucide-react';
 import { useRecordStore } from '../lib/store';
-import RecordCard from './RecordCard';
+import { RecordCard } from '@module-federation-vite/ui/RecordCard';
+import { ErrorBoundary } from '@module-federation-vite/ui/ErrorBoundary';
 import SearchBar from './SearchBar';
 import ImportModal from './ImportModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -77,9 +78,9 @@ export default function RecordCollector() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Action Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white border-b border-gray-200 flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
@@ -109,10 +110,10 @@ export default function RecordCollector() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 flex flex-col min-h-0">
         {/* Statistics Cards */}
         {records.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 flex-shrink-0">
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -144,9 +145,9 @@ export default function RecordCollector() {
         )}
 
         {/* Search and Content */}
-        <div className="space-y-6">
+        <div className="flex flex-col flex-1 min-h-0">
           {/* Search Bar */}
-          <div className="max-w-md">
+          <div className="max-w-md mb-6 flex-shrink-0">
             <SearchBar
               value={searchTerm}
               onChange={setSearchTerm}
@@ -155,38 +156,42 @@ export default function RecordCollector() {
           </div>
 
           {/* Records Grid */}
-          {filteredRecords.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredRecords.map((record) => (
-                <RecordCard
-                  key={record.id}
-                  record={record}
-                  onDelete={handleDeleteRecord}
-                  onSelect={setSelectedRecord}
-                  isSelected={selectedRecord?.id === record.id}
-                />
-              ))}
-            </div>
-          ) : records.length > 0 ? (
-            <div className="text-center py-12">
-              <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No records found</h3>
-              <p className="text-gray-600">Try adjusting your search terms</p>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Database className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No records yet</h3>
-              <p className="text-gray-600 mb-6">Get started by importing your first CSV file</p>
-              <button
-                onClick={() => setShowImportModal(true)}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Upload className="w-5 h-5" />
-                Import Your First Records
-              </button>
-            </div>
-          )}
+          <div className="flex-1 overflow-y-auto min-h-0 -mx-4 px-4">
+            {filteredRecords.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
+                {filteredRecords.map((record) => (
+                  <ErrorBoundary key={record.id}>
+                    <RecordCard
+                      record={record}
+                      onDelete={handleDeleteRecord}
+                      onSelect={setSelectedRecord}
+                      isSelected={selectedRecord?.id === record.id}
+                      variant="collector"
+                    />
+                  </ErrorBoundary>
+                ))}
+              </div>
+            ) : records.length > 0 ? (
+              <div className="text-center py-12">
+                <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No records found</h3>
+                <p className="text-gray-600">Try adjusting your search terms</p>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Database className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No records yet</h3>
+                <p className="text-gray-600 mb-6">Get started by importing your first CSV file</p>
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Upload className="w-5 h-5" />
+                  Import Your First Records
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
