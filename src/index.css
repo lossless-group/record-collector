@@ -23,3 +23,24 @@ body {
 #root {
   min-height: 100vh;
 }
+
+/* Card wrapper styles for federated usage */
+.record-collector-card-wrapper {
+  height: 100%;
+  overflow: hidden;
+}
+
+.record-collector-card-wrapper .min-h-screen {
+  min-height: auto;
+  height: 100%;
+}
+
+.record-collector-card-wrapper .bg-gray-50 {
+  background: transparent;
+}
+
+/* Ensure modals can break out of card constraints */
+.record-collector-card-wrapper .fixed {
+  position: fixed !important;
+  z-index: 9999 !important;
+}
